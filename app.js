@@ -140,11 +140,11 @@
     e.preventDefault();
     const lines = cartLines();
     if (!lines.length) return;
-    // If the page was left open past the cut-off, the breakfast date may have moved: refresh and ask to re-pick.
+    // If the page was left open past the cut-off, the delivery date may have moved: refresh and ask to re-pick.
     const sel = $("slotSelect").selectedOptions[0];
     if (sel && sel.dataset.base && slotLabel(sel.dataset.base) !== sel.value) {
       renderSlots();
-      return toast("Breakfast cut-off passed — delivery date updated. Please choose your slot again.");
+      return toast("Order cut-off passed — delivery date updated. Please choose your slot again.");
     }
     const f = Object.fromEntries(new FormData(e.target));
     f.payment = "UPI (customer says paid — verify screenshot)";
@@ -182,24 +182,31 @@
       () => toast("Couldn't get location — paste a Maps link instead")
     );
   };
-  // ---------- Breakfast next-day cut-off ----------
+  // ---------- Delivery dates & cut-offs ----------
   const isBreakfastSlot = (s) => /breakfast/i.test(s);
-  // Delivery date for breakfast: tomorrow if ordering before the cut-off hour (shop time zone), else the day after.
-  function breakfastDateLabel() {
-    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+  const isLunchSlot = (s) => /lunch/i.test(s);
+  // Current date/hour in the shop's time zone.
+  function shopNow() {
+    return Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
       timeZone: C.timeZone || "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
     }).formatToParts(new Date()).map((x) => [x.type, x.value]));
-    const daysAhead = Number(p.hour) < (C.breakfastCutoffHour ?? 22) ? 1 : 2;
-    const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + daysAhead));
-    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
   }
-  const slotLabel = (s) => (isBreakfastSlot(s) ? `${s} · ${breakfastDateLabel()}` : s);
+  const dateLabel = (p, daysAhead) =>
+    new Date(Date.UTC(+p.year, +p.month - 1, +p.day + daysAhead))
+      .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  // Breakfast: tomorrow if ordered before the cut-off hour (default 10 PM), else the day after.
+  const breakfastDateLabel = () => { const p = shopNow(); return dateLabel(p, Number(p.hour) < (C.breakfastCutoffHour ?? 22) ? 1 : 2); };
+  // Lunch: orders for a day close at lunchCutoffHour (default 9 AM) on that same day. Before it, lunch is today's; after, tomorrow's.
+  const lunchDateLabel = () => { const p = shopNow(); return dateLabel(p, Number(p.hour) < (C.lunchCutoffHour ?? 9) ? 0 : 1); };
+  const slotLabel = (s) =>
+    isBreakfastSlot(s) ? `${s} · ${breakfastDateLabel()}` : isLunchSlot(s) ? `${s} · ${lunchDateLabel()}` : s;
+  const hour12 = (h) => `${h % 12 || 12} ${h >= 12 ? "PM" : "AM"}`;
   function renderSlots() {
     $("slotSelect").innerHTML = `<option value="">Choose delivery slot</option>` +
       C.deliverySlots.map((s) => `<option value="${esc(slotLabel(s))}" data-base="${esc(s)}">${esc(slotLabel(s))}</option>`).join("");
-    const cut = C.breakfastCutoffHour ?? 22;
-    const h12 = cut % 12 || 12, ap = cut >= 12 ? "PM" : "AM";
-    $("cutoffNote").textContent = `🕙 Breakfast is delivered next day — order by ${h12} ${ap} the evening before. Ordering now? Your breakfast arrives ${breakfastDateLabel()}.`;
+    $("cutoffNote").textContent =
+      `🕙 Breakfast: order by ${hour12(C.breakfastCutoffHour ?? 22)} the evening before. Lunch: order by ${hour12(C.lunchCutoffHour ?? 9)} on the delivery day.\n` +
+      `Ordering now? Breakfast arrives ${breakfastDateLabel()} · Lunch arrives ${lunchDateLabel()}.`;
     $("cutoffNote").hidden = false;
   }
   renderSlots();

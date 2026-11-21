@@ -31,6 +31,9 @@ window.CONFIG = {
   // Breakfast is next-day delivery: order before this hour (24h clock, shop time zone) the evening before.
   // e.g. 22 = 10 PM. After the cut-off, breakfast orders move to the day after tomorrow.
   breakfastCutoffHour: 22,
+  // Lunch (12-1 PM): orders for a day close at this hour on the same day. e.g. 9 = 9 AM.
+  // Order any time the day before, or up to 9 AM that day. After the cut-off, lunch moves to the next day.
+  lunchCutoffHour: 9,
   timeZone: "Asia/Kolkata",
 
   // OPTIONAL (see README): edit the menu from a Google Sheet instead of this file.
