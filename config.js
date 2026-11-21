@@ -7,7 +7,7 @@ window.CONFIG = {
 
   // Delivery area (shown on the site and at checkout)
   city: "Udaipur",
-  deliveryArea: "IT Park",
+  deliveryArea: "IT Park & Madri Industrial Area, within 2 km of Arcgate",
 
   // Parents' WhatsApp number with country code, digits only (e.g. India: 919876543210)
   whatsappNumber: "919680079769",
@@ -28,12 +28,17 @@ window.CONFIG = {
   freeDeliveryMin: 99,
   deliveryCharge: 39,
 
+  // Breakfast is next-day delivery: order before this hour (24h clock, shop time zone) the evening before.
+  // e.g. 22 = 10 PM. After the cut-off, breakfast orders move to the day after tomorrow.
+  breakfastCutoffHour: 22,
+  timeZone: "Asia/Kolkata",
+
   // OPTIONAL (see README): edit the menu from a Google Sheet instead of this file.
   // Paste the "Publish to web → CSV" link here. Leave "" to use the menu below.
   sheetCsvUrl: "",
 
   // OPTIONAL (see README): Google Apps Script URL that logs every order into a Google Sheet.
-  orderWebhookUrl: "",
+  orderWebhookUrl: "https://script.google.com/macros/s/AKfycbzUv0kR2U2MoSXaI2Mz2Rs2MR9drj5TupGsJsjBTplM_9ImQPtqFlehvzBY79Z4TLE/exec",
 
   // Default menu (all vegetarian).
   // category: "Breakfast" or "Lunch". available: false shows "Sold out".

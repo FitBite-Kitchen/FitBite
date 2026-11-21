@@ -117,8 +117,18 @@
     const total = cartTotal();
     $("payAmount").textContent = money(total);
     $("upiIdText").textContent = C.upiId;
-    $("upiQr").src = C.upiQrImage;
-    $("upiLink").href = `upi://pay?pa=${encodeURIComponent(C.upiId)}&pn=${encodeURIComponent(C.upiName)}&am=${total}&cu=INR`;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(C.upiId)}&pn=${encodeURIComponent(C.upiName)}&am=${total}&cu=INR`;
+    $("upiLink").href = upiUrl;
+    // QR is generated for this exact order amount. Falls back to the static QR image if generation fails.
+    try {
+      const qr = window.qrcode(0, "M");
+      qr.addData(upiUrl);
+      qr.make();
+      $("upiQr").src = qr.createDataURL(6, 4);
+    } catch (e) {
+      console.warn("Could not generate QR, using static image.", e);
+      $("upiQr").src = C.upiQrImage;
+    }
   }
 
   function toast(msg) {
@@ -130,6 +140,12 @@
     e.preventDefault();
     const lines = cartLines();
     if (!lines.length) return;
+    // If the page was left open past the cut-off, the breakfast date may have moved: refresh and ask to re-pick.
+    const sel = $("slotSelect").selectedOptions[0];
+    if (sel && sel.dataset.base && slotLabel(sel.dataset.base) !== sel.value) {
+      renderSlots();
+      return toast("Breakfast cut-off passed — delivery date updated. Please choose your slot again.");
+    }
     const f = Object.fromEntries(new FormData(e.target));
     f.payment = "UPI (customer says paid — verify screenshot)";
     delete f.paid;
@@ -138,7 +154,7 @@
     const fee = deliveryFee();
     const itemsText = lines.map((l) => `• ${l.item.name} x${l.qty} = ${money(l.item.price * l.qty)}`).join("\n")
       + (fee ? `\n• Delivery charge = ${money(fee)}` : `\n• Delivery = Free`);
-    const msg = `*New order ${orderId}*\n${itemsText}\n\n*Total: ${money(total)}*\nPayment: ${f.payment}\nSlot: ${f.slot}\n\nName: ${f.name}\nPhone: ${f.phone}\nAddress (${C.deliveryArea}, ${C.city}): ${f.address}${f.mapLink ? `\nMap: ${f.mapLink}` : ""}${f.notes ? `\nNotes: ${f.notes}` : ""}`;
+    const msg = `*New order ${orderId}*\n${itemsText}\n\n*Total: ${money(total)}*\nPayment: ${f.payment}\nSlot: ${f.slot}\n\nName: ${f.name}\nPhone: ${f.phone}\nAddress: ${f.address}${f.mapLink ? `\nMap: ${f.mapLink}` : ""}${f.notes ? `\nNotes: ${f.notes}` : ""}`;
 
     // Optional: log to Google Sheet (fire-and-forget)
     if (C.orderWebhookUrl) {
@@ -156,9 +172,9 @@
   // ---------- Init ----------
   document.title = C.businessName;
   $("shopName").textContent = C.businessName;
-  $("tagline").textContent = `${C.tagline} Delivering within ${C.deliveryArea}, ${C.city}.`;
-  $("areaNote").textContent = `We deliver only inside ${C.deliveryArea}, ${C.city}.`;
-  $("addressInput").placeholder = `Company / building / floor / desk (inside ${C.deliveryArea})`;
+  $("tagline").textContent = `${C.tagline} Delivering only in ${C.deliveryArea}, ${C.city}.`;
+  $("areaNote").textContent = `We deliver only in ${C.deliveryArea}, ${C.city}.`;
+  $("addressInput").placeholder = `Company / building / floor / desk`;
   $("locBtn").onclick = () => {
     if (!navigator.geolocation) return toast("Location not supported — paste a Maps link instead");
     navigator.geolocation.getCurrentPosition(
@@ -166,7 +182,27 @@
       () => toast("Couldn't get location — paste a Maps link instead")
     );
   };
-  $("slotSelect").innerHTML = `<option value="">Choose delivery slot</option>` + C.deliverySlots.map((s) => `<option>${esc(s)}</option>`).join("");
+  // ---------- Breakfast next-day cut-off ----------
+  const isBreakfastSlot = (s) => /breakfast/i.test(s);
+  // Delivery date for breakfast: tomorrow if ordering before the cut-off hour (shop time zone), else the day after.
+  function breakfastDateLabel() {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: C.timeZone || "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const daysAhead = Number(p.hour) < (C.breakfastCutoffHour ?? 22) ? 1 : 2;
+    const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + daysAhead));
+    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  }
+  const slotLabel = (s) => (isBreakfastSlot(s) ? `${s} · ${breakfastDateLabel()}` : s);
+  function renderSlots() {
+    $("slotSelect").innerHTML = `<option value="">Choose delivery slot</option>` +
+      C.deliverySlots.map((s) => `<option value="${esc(slotLabel(s))}" data-base="${esc(s)}">${esc(slotLabel(s))}</option>`).join("");
+    const cut = C.breakfastCutoffHour ?? 22;
+    const h12 = cut % 12 || 12, ap = cut >= 12 ? "PM" : "AM";
+    $("cutoffNote").textContent = `🕙 Breakfast is delivered next day — order by ${h12} ${ap} the evening before. Ordering now? Your breakfast arrives ${breakfastDateLabel()}.`;
+    $("cutoffNote").hidden = false;
+  }
+  renderSlots();
   loadMenu().then(() => { renderTabs(); refresh(); });
   renderTabs(); refresh();
 })();
