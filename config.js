@@ -24,6 +24,10 @@ window.CONFIG = {
     "Lunch 12:00 – 1:00 PM",
   ],
 
+  // Delivery charge: free when the food total is at least freeDeliveryMin, otherwise deliveryCharge is added.
+  freeDeliveryMin: 99,
+  deliveryCharge: 39,
+
   // OPTIONAL (see README): edit the menu from a Google Sheet instead of this file.
   // Paste the "Publish to web → CSV" link here. Leave "" to use the menu below.
   sheetCsvUrl: "",
